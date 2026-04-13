@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Lock } from "lucide-react";
 
 export function Header() {
   return (
@@ -15,6 +16,13 @@ export function Header() {
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             About
+          </Link>
+          <Link
+            href="/admin"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            <Lock className="h-3 w-3" />
+            Staff
           </Link>
           <ThemeToggle />
         </div>

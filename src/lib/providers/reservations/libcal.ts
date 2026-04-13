@@ -4,13 +4,13 @@ import type {
   RoomAvailability,
 } from "@/lib/types";
 
-const BASE_URL = "https://calendar.lib.purdue.edu/api/1.1";
+export const LIBCAL_BASE_URL = "https://calendar.lib.purdue.edu/api/1.1";
 
 /**
  * Maps library slugs to LibCal location ID(s).
  * WALC has a second location (17792) for the Knowledge Lab / Podcast Studio.
  */
-const SLUG_TO_LOCATION_IDS: Record<string, number[]> = {
+export const SLUG_TO_LOCATION_IDS: Record<string, number[]> = {
   walc: [13748, 17792],
   hsse: [9178],
   kran: [9177],
@@ -32,7 +32,7 @@ const ACTIVE_STATUSES = new Set([
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-async function getAccessToken(
+export async function getAccessToken(
   clientId: string,
   clientSecret: string,
 ): Promise<string> {
@@ -40,7 +40,7 @@ async function getAccessToken(
     return cachedToken.token;
   }
 
-  const res = await fetch(`${BASE_URL}/oauth/token`, {
+  const res = await fetch(`${LIBCAL_BASE_URL}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -81,7 +81,30 @@ interface LibCalSpaceItem {
   name: string;
   capacity: number;
   zoneName: string;
+  _lid?: number;
+  _cid?: number;
 }
+
+interface LibCalCategorySummary {
+  cid: number;
+  name: string;
+  formid: number;
+  public: number;
+}
+
+interface LibCalCategoryListResponse {
+  lid: number;
+  name: string;
+  categories: LibCalCategorySummary[];
+}
+
+interface LibCalCategoryDetail {
+  cid: number;
+  name: string;
+  items: number[];
+}
+
+const BOOKING_BASE = "https://calendar.lib.purdue.edu/spaces";
 
 // ── Provider ──
 
@@ -96,7 +119,7 @@ export class LibCalProvider implements ReservationsProvider {
 
   private async fetch<T>(path: string): Promise<T> {
     const token = await getAccessToken(this.clientId, this.clientSecret);
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${LIBCAL_BASE_URL}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       next: { revalidate: 0 },
     });
@@ -123,17 +146,36 @@ export class LibCalProvider implements ReservationsProvider {
 
     const allItems: LibCalSpaceItem[] = [];
     const allBookings: LibCalBooking[] = [];
+    const itemToCid = new Map<number, number>();
 
     const dateStr = toDateString(start);
 
     await Promise.all(
       locationIds.map(async (lid) => {
-        const [items, bookings] = await Promise.all([
+        const [items, bookings, catListResponse] = await Promise.all([
           this.fetch<LibCalSpaceItem[]>(`/space/items/${lid}`),
           this.fetch<LibCalBooking[]>(
             `/space/bookings?lid=${lid}&date=${dateStr}&days=1&limit=500&include_cancel=0&include_tentative=1`,
           ),
+          this.fetch<LibCalCategoryListResponse[]>(`/space/categories/${lid}`),
         ]);
+        for (const item of items) item._lid = lid;
+
+        const catSummaries = catListResponse?.[0]?.categories ?? [];
+        const catDetails = await Promise.all(
+          catSummaries.map((c) =>
+            this.fetch<LibCalCategoryDetail[]>(`/space/category/${c.cid}`)
+              .then((r) => r?.[0])
+              .catch(() => null),
+          ),
+        );
+        for (const detail of catDetails) {
+          if (!detail?.items) continue;
+          for (const itemId of detail.items) {
+            itemToCid.set(itemId, detail.cid);
+          }
+        }
+
         allItems.push(...items);
         allBookings.push(...bookings);
       }),
@@ -170,6 +212,11 @@ export class LibCalProvider implements ReservationsProvider {
         nextChangeAt = overlapping!.toDate;
       }
 
+      const cid = itemToCid.get(item.id);
+      const bookingUrl = item._lid
+        ? `${BOOKING_BASE}?lid=${item._lid}${cid ? `&gid=${cid}` : ""}`
+        : null;
+
       return {
         roomId: String(item.id),
         displayName: item.name,
@@ -177,6 +224,8 @@ export class LibCalProvider implements ReservationsProvider {
         capacity: item.capacity ?? null,
         isAvailable,
         nextChangeAt,
+        bookingUrl,
+        locationId: item._lid ?? null,
       };
     });
 

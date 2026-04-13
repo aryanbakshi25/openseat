@@ -6,7 +6,6 @@ INSERT INTO libraries (slug, name) VALUES
   ('hsse',    'Humanities, Social Science & Education Library (HSSE)'),
   ('walc',    'Wilmeth Active Learning Center (WALC)'),
   ('hicks',   'Hicks Undergraduate Library'),
-  ('stew',    'Stewart Center'),
   ('math',    'Mathematical Sciences Library'),
   ('kran',    'Krannert Library of Management & Economics (Parrish)'),
   ('vetmed',  'Veterinary Medical Library')
@@ -35,10 +34,6 @@ INSERT INTO rooms (library_id, display_name, floor, capacity, is_reservable) VAL
   ((SELECT id FROM libraries WHERE slug = 'kran'), 'Financial Conference Room KRAN 230A', '2nd Floor', 21, true),
   ((SELECT id FROM libraries WHERE slug = 'kran'), 'Learn Lab KRAN 250',                  '2nd Floor', 40, true),
   ((SELECT id FROM libraries WHERE slug = 'kran'), 'Corporate Study Room KRAN 258/260',   '2nd Floor', 35, true);
-
--- Stewart rooms
-INSERT INTO rooms (library_id, display_name, floor, capacity, is_reservable) VALUES
-  ((SELECT id FROM libraries WHERE slug = 'stew'), 'Digital Humanities Studio STEW 153', '1st Floor', 12, true);
 
 -- VetMed rooms
 INSERT INTO rooms (library_id, display_name, floor, capacity, is_reservable) VALUES

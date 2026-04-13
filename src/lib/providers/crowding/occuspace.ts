@@ -58,6 +58,17 @@ export class OccuspaceProvider implements CrowdingProvider {
     this.token = token;
   }
 
+  private async fetchLocation(locationId: number): Promise<OccuspaceNowResponse> {
+    const res = await fetch(`${BASE_URL}/locations/${locationId}/now`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) {
+      throw new Error(`Occuspace API error ${res.status}: ${await res.text()}`);
+    }
+    return res.json();
+  }
+
   async getCrowding(librarySlug: string): Promise<CrowdingData> {
     const locationId = SLUG_TO_LOCATION_ID[librarySlug];
 
@@ -67,33 +78,46 @@ export class OccuspaceProvider implements CrowdingProvider {
       );
     }
 
-    const res = await fetch(`${BASE_URL}/locations/${locationId}/now`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-      next: { revalidate: 0 },
-    });
-
-    if (!res.ok) {
-      throw new Error(
-        `Occuspace API error ${res.status}: ${await res.text()}`,
-      );
-    }
-
-    const json: OccuspaceNowResponse = await res.json();
+    const json = await this.fetchLocation(locationId);
     const { data } = json;
 
     const overallPercent = Math.round(data.percentage * 100);
 
-    const subAreas: SubAreaCrowding[] = (data.childCounts ?? [])
-      .filter((child) => child.isActive)
-      .map((child) => {
+    const topChildren = (data.childCounts ?? []).filter((c) => c.isActive);
+
+    // Fetch second-level children for each floor in parallel
+    const subAreas: SubAreaCrowding[] = await Promise.all(
+      topChildren.map(async (child) => {
         const pct = Math.round(child.percentage * 100);
+        let children: SubAreaCrowding[] | undefined;
+
+        try {
+          const childJson = await this.fetchLocation(child.id);
+          const grandChildren = (childJson.data.childCounts ?? []).filter((gc) => gc.isActive);
+          if (grandChildren.length > 0) {
+            children = grandChildren.map((gc) => {
+              const gcPct = Math.round(gc.percentage * 100);
+              return {
+                name: gc.name,
+                occupancyPercent: gcPct,
+                level: levelFromPercent(gcPct),
+                count: gc.count,
+              };
+            });
+          }
+        } catch {
+          // If sub-area fetch fails, just show the floor without children
+        }
+
         return {
           name: child.name,
           occupancyPercent: pct,
           level: levelFromPercent(pct),
           count: child.count,
+          children,
         };
-      });
+      }),
+    );
 
     return {
       librarySlug,

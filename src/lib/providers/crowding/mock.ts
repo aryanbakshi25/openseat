@@ -22,7 +22,6 @@ const SUB_AREAS: Record<string, string[]> = {
   hsse: ["1st Floor", "2nd Floor", "3rd Floor", "Collaborative Study Center"],
   walc: ["1st Floor", "2nd Floor", "3rd Floor", "Active Learning Center"],
   hicks: ["Basement", "1st Floor", "2nd Floor"],
-  stew: ["1st Floor", "Digital Humanities Studio"],
   math: ["1st Floor", "2nd Floor"],
   kran: ["1st Floor", "2nd Floor"],
   vetmed: ["1st Floor Study Area"],

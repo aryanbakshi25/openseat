@@ -36,6 +36,7 @@ export interface SubAreaCrowding {
   occupancyPercent: number;
   level: CrowdLevel;
   count?: number;
+  children?: SubAreaCrowding[];
 }
 
 export interface CrowdingData {
@@ -54,6 +55,8 @@ export interface RoomAvailability {
   capacity: number | null;
   isAvailable: boolean;
   nextChangeAt: string | null; // ISO string — when status flips
+  bookingUrl: string | null;
+  locationId: number | null;
 }
 
 export interface AvailabilityData {
@@ -61,6 +64,19 @@ export interface AvailabilityData {
   windowStart: string; // ISO
   windowEnd: string; // ISO
   rooms: RoomAvailability[];
+}
+
+export interface DayHours {
+  date: string; // YYYY-MM-DD
+  hours: string; // e.g. "8am – 12am", "Closed"
+  isClosed: boolean;
+  note?: string; // e.g. "Spring Break", "24/7 access with PUID"
+}
+
+export interface LibraryHours {
+  slug: string;
+  locationName: string;
+  days: DayHours[];
 }
 
 // ── Provider interfaces ──

@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CrowdBadge } from "@/components/crowd-badge";
-import { ArrowLeft, Clock, Users } from "lucide-react";
-import type { CrowdingData, AvailabilityData } from "@/lib/types";
+import { ArrowLeft, Clock, Users, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import type { CrowdingData, AvailabilityData, SubAreaCrowding, RoomAvailability } from "@/lib/types";
 
 const TIME_WINDOWS = [
   { label: "Now", offsetMinutes: 0 },
@@ -25,6 +25,122 @@ function formatTime(iso: string | null) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+const SECONDARY_LOCATION_IDS: Record<string, { ids: number[]; label: string }> = {
+  walc: { ids: [17792], label: "Knowledge Lab (WALC 3007)" },
+};
+
+function RoomCard({ room }: { room: RoomAvailability }) {
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">{room.displayName}</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+              {room.floor && <span>{room.floor}</span>}
+              {room.capacity && (
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {room.capacity}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="text-right">
+              <Badge
+                variant="secondary"
+                className={
+                  room.isAvailable
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                }
+              >
+                {room.isAvailable ? "Available" : "Reserved"}
+              </Badge>
+              {room.nextChangeAt && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {room.isAvailable ? "Until" : "Free at"}{" "}
+                  {formatTime(room.nextChangeAt)}
+                </p>
+              )}
+            </div>
+            {room.bookingUrl && (
+              <a href={room.bookingUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="shrink-0">
+                  Book
+                  <ExternalLink className="h-3 w-3 ml-1" />
+                </Button>
+              </a>
+            )}
+          </div>
+          {/* Mobile: badge only */}
+          <div className="sm:hidden text-right">
+            <Badge
+              variant="secondary"
+              className={
+                room.isAvailable
+                  ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                  : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+              }
+            >
+              {room.isAvailable ? "Available" : "Reserved"}
+            </Badge>
+            {room.nextChangeAt && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {room.isAvailable ? "Until" : "Free at"}{" "}
+                {formatTime(room.nextChangeAt)}
+              </p>
+            )}
+          </div>
+        </div>
+        {/* Mobile: book button centered at bottom */}
+        {room.bookingUrl && (
+          <div className="sm:hidden mt-3 flex justify-center">
+            <a href={room.bookingUrl} target="_blank" rel="noopener noreferrer" className="w-full">
+              <Button variant="outline" className="w-full h-10 text-sm">
+                Book
+                <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+              </Button>
+            </a>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoomList({ rooms, librarySlug }: { rooms: RoomAvailability[]; librarySlug: string }) {
+  const secondary = SECONDARY_LOCATION_IDS[librarySlug];
+  const secondaryIds = new Set(secondary?.ids ?? []);
+
+  const mainRooms = secondary
+    ? rooms.filter((r) => !r.locationId || !secondaryIds.has(r.locationId))
+    : rooms;
+  const secondaryRooms = secondary
+    ? rooms.filter((r) => r.locationId && secondaryIds.has(r.locationId))
+    : [];
+
+  return (
+    <div className="space-y-3">
+      {mainRooms.map((room) => (
+        <RoomCard key={room.roomId} room={room} />
+      ))}
+
+      {secondaryRooms.length > 0 && (
+        <>
+          <div className="pt-4 pb-1">
+            <h3 className="text-sm font-semibold text-muted-foreground">{secondary!.label}</h3>
+          </div>
+          {secondaryRooms.map((room) => (
+            <RoomCard key={room.roomId} room={room} />
+          ))}
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function LibraryPage() {
@@ -73,10 +189,29 @@ export default function LibraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, roomsFetchId]);
 
-  // Find lowest crowding sub-area
-  const bestArea = crowding?.subAreas.reduce((a, b) =>
-    a.occupancyPercent < b.occupancyPercent ? a : b,
-  );
+  const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
+
+  function toggleFloor(name: string) {
+    setExpandedFloors((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  // Find lowest crowding sub-area (check children too)
+  const allAreas: SubAreaCrowding[] = [];
+  for (const area of crowding?.subAreas ?? []) {
+    if (area.children && area.children.length > 0) {
+      allAreas.push(...area.children);
+    } else {
+      allAreas.push(area);
+    }
+  }
+  const bestArea = allAreas.length > 0
+    ? allAreas.reduce((a, b) => (a.occupancyPercent < b.occupancyPercent ? a : b))
+    : undefined;
 
   return (
     <div>
@@ -124,34 +259,82 @@ export default function LibraryPage() {
             </div>
           ) : crowding ? (
             <div className="space-y-3">
-              {crowding.subAreas.map((area) => (
-                <Card key={area.name}>
-                  <CardContent className="flex items-center justify-between py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">{area.name}</span>
-                      {bestArea?.name === area.name && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+              {crowding.subAreas.map((area) => {
+                const hasChildren = area.children && area.children.length > 0;
+                const isFloorExpanded = expandedFloors.has(area.name);
+
+                return (
+                  <div key={area.name}>
+                    <Card>
+                      <CardContent className="py-0">
+                        <button
+                          onClick={() => hasChildren && toggleFloor(area.name)}
+                          className={`w-full flex items-center justify-between py-4 ${hasChildren ? "cursor-pointer" : "cursor-default"}`}
                         >
-                          Best area
-                        </Badge>
-                      )}
-                      {area.count != null && (
-                        <span className="text-xs text-muted-foreground">
-                          ~{area.count}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg font-semibold tabular-nums">
-                        {area.occupancyPercent}%
-                      </span>
-                      <CrowdBadge level={area.level} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                          <div className="flex items-center gap-2">
+                            {hasChildren && (
+                              isFloorExpanded
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="font-medium">{area.name}</span>
+                            {area.count != null && (
+                              <span className="text-xs text-muted-foreground">
+                                ~{area.count}
+                              </span>
+                            )}
+                            {hasChildren && !isFloorExpanded && (
+                              <span className="text-xs text-muted-foreground">
+                                ({area.children!.length} areas)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-semibold tabular-nums">
+                              {area.occupancyPercent}%
+                            </span>
+                            <CrowdBadge level={area.level} />
+                          </div>
+                        </button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Sub-areas within this floor */}
+                    {hasChildren && isFloorExpanded && (
+                      <div className="ml-6 mt-1.5 space-y-1.5">
+                        {area.children!.map((child) => (
+                          <Card key={child.name} className="border-dashed">
+                            <CardContent className="flex items-center justify-between py-3">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm font-medium">{child.name}</span>
+                                {bestArea?.name === child.name && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs"
+                                  >
+                                    Least busy
+                                  </Badge>
+                                )}
+                                {child.count != null && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ~{child.count}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-semibold tabular-nums">
+                                  {child.occupancyPercent}%
+                                </span>
+                                <CrowdBadge level={child.level} />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               <p className="text-xs text-muted-foreground mt-4">
                 <Clock className="inline h-3 w-3 mr-1" />
@@ -187,44 +370,7 @@ export default function LibraryPage() {
               ))}
             </div>
           ) : availability?.rooms && availability.rooms.length > 0 ? (
-            <div className="space-y-3">
-              {availability.rooms.map((room) => (
-                <Card key={room.roomId}>
-                  <CardContent className="flex items-center justify-between py-4">
-                    <div>
-                      <p className="font-medium">{room.displayName}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                        {room.floor && <span>{room.floor}</span>}
-                        {room.capacity && (
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {room.capacity}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge
-                        variant="secondary"
-                        className={
-                          room.isAvailable
-                            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                            : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                        }
-                      >
-                        {room.isAvailable ? "Available" : "Reserved"}
-                      </Badge>
-                      {room.nextChangeAt && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {room.isAvailable ? "Until" : "Free at"}{" "}
-                          {formatTime(room.nextChangeAt)}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <RoomList rooms={availability.rooms} librarySlug={slug} />
           ) : (
             <p className="text-muted-foreground">
               No reservable rooms found for this library.
