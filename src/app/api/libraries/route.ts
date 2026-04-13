@@ -3,6 +3,15 @@ import { getServiceClient } from "@/lib/supabase/server";
 import { getCached, setCache } from "@/lib/cache";
 import type { Library } from "@/lib/types";
 
+const SLUG_ORDER: Record<string, number> = {
+  walc: 0,
+  hsse: 1,
+  hicks: 2,
+  kran: 3,
+  math: 4,
+  vetmed: 5,
+};
+
 export async function GET() {
   const cacheKey = "libraries:all";
   const cached = getCached<Library[]>(cacheKey);
@@ -12,15 +21,18 @@ export async function GET() {
     const supabase = getServiceClient();
     const { data, error } = await supabase
       .from("libraries")
-      .select("*")
-      .order("name");
+      .select("*");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    setCache(cacheKey, data);
-    return NextResponse.json(data);
+    const sorted = (data ?? []).sort(
+      (a, b) => (SLUG_ORDER[a.slug] ?? 99) - (SLUG_ORDER[b.slug] ?? 99),
+    );
+
+    setCache(cacheKey, sorted);
+    return NextResponse.json(sorted);
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch libraries" },
