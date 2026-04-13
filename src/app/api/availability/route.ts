@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
     );
     setCache(cacheKey, data);
     return NextResponse.json(data);
-  } catch {
+  } catch (err) {
+    console.error("Availability error:", err);
     return NextResponse.json(
       { error: "Failed to fetch availability" },
       { status: 500 },

@@ -152,32 +152,35 @@ export class LibCalProvider implements ReservationsProvider {
 
     await Promise.all(
       locationIds.map(async (lid) => {
-        const [items, bookings, catListResponse] = await Promise.all([
+        const [items, bookings] = await Promise.all([
           this.fetch<LibCalSpaceItem[]>(`/space/items/${lid}`),
           this.fetch<LibCalBooking[]>(
             `/space/bookings?lid=${lid}&date=${dateStr}&days=1&limit=500&include_cancel=0&include_tentative=1`,
           ),
-          this.fetch<LibCalCategoryListResponse[]>(`/space/categories/${lid}`),
         ]);
         for (const item of items) item._lid = lid;
-
-        const catSummaries = catListResponse?.[0]?.categories ?? [];
-        const catDetails = await Promise.all(
-          catSummaries.map((c) =>
-            this.fetch<LibCalCategoryDetail[]>(`/space/category/${c.cid}`)
-              .then((r) => r?.[0])
-              .catch(() => null),
-          ),
-        );
-        for (const detail of catDetails) {
-          if (!detail?.items) continue;
-          for (const itemId of detail.items) {
-            itemToCid.set(itemId, detail.cid);
-          }
-        }
-
         allItems.push(...items);
         allBookings.push(...bookings);
+
+        try {
+          const catListResponse = await this.fetch<LibCalCategoryListResponse[]>(`/space/categories/${lid}`);
+          const catSummaries = catListResponse?.[0]?.categories ?? [];
+          const catDetails = await Promise.all(
+            catSummaries.map((c) =>
+              this.fetch<LibCalCategoryDetail[]>(`/space/category/${c.cid}`)
+                .then((r) => r?.[0])
+                .catch(() => null),
+            ),
+          );
+          for (const detail of catDetails) {
+            if (!detail?.items) continue;
+            for (const itemId of detail.items) {
+              itemToCid.set(itemId, detail.cid);
+            }
+          }
+        } catch {
+          // Category lookup is optional — rooms still work with location-only URLs
+        }
       }),
     );
 
