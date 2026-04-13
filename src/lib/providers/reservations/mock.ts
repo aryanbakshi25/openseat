@@ -68,6 +68,8 @@ export class MockReservationsProvider implements ReservationsProvider {
         capacity: room.capacity,
         isAvailable,
         nextChangeAt,
+        bookingUrl: null,
+        locationId: null,
       };
     });
 
