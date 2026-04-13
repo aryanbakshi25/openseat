@@ -408,7 +408,7 @@ export default function AdminBookingsPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
                             {/* Booking status */}
                             <Badge
                               className={`${statusBadgeClass} text-xs font-medium border-0`}
