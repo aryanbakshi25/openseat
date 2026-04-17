@@ -161,12 +161,13 @@ export default function AdminBookingsPage() {
     for (const arr of Object.values(byRoom)) {
       arr.sort((a, b) => new Date(a.fromDate).getTime() - new Date(b.fromDate).getTime());
     }
-    const isInterview = (name: string) => /interview/i.test(name);
+    const isPriority = (name: string) =>
+      /interview/i.test(name) || /2141/i.test(name);
     return Object.entries(byRoom).sort(([a], [b]) => {
-      const ai = isInterview(a);
-      const bi = isInterview(b);
-      if (ai && !bi) return -1;
-      if (!ai && bi) return 1;
+      const ap = isPriority(a);
+      const bp = isPriority(b);
+      if (ap && !bp) return -1;
+      if (!ap && bp) return 1;
       return a.localeCompare(b);
     });
   }
