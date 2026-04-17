@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   ShieldQuestion,
-  XCircle,
   CalendarDays,
   Building2,
   ChevronDown,
@@ -119,7 +118,6 @@ export default function AdminBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<string>("tentative");
-  const [cancelling, setCancelling] = useState<Set<string>>(new Set());
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -151,40 +149,6 @@ export default function AdminBookingsPage() {
   useEffect(() => {
     fetchBookings(tab);
   }, [tab, fetchBookings]);
-
-  async function handleCancel(bookId: string) {
-    if (!confirm("Cancel this booking? This cannot be undone.")) return;
-    setCancelling((prev) => new Set(prev).add(bookId));
-    try {
-      const res = await fetch("/api/admin/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(`Cancel failed: ${data.error || "Unknown error"}`);
-        return;
-      }
-      setGrouped((prev) => {
-        const next: Record<string, AdminBooking[]> = {};
-        for (const [loc, bookings] of Object.entries(prev)) {
-          const filtered = bookings.filter((b) => b.bookId !== bookId);
-          if (filtered.length > 0) next[loc] = filtered;
-        }
-        return next;
-      });
-      setTotal((t) => t - 1);
-    } catch {
-      alert("Failed to cancel booking. Please try again.");
-    } finally {
-      setCancelling((prev) => {
-        const next = new Set(prev);
-        next.delete(bookId);
-        return next;
-      });
-    }
-  }
 
   const locations = Object.keys(grouped).sort();
   const showClassification = tab === "tentative" || tab === "all";
@@ -359,7 +323,6 @@ export default function AdminBookingsPage() {
                   const config =
                     CLASSIFICATION_CONFIG[booking.classification];
                   const StatusIcon = config.Icon;
-                  const isCancelling = cancelling.has(booking.bookId);
                   const statusBadgeClass =
                     STATUS_BADGE[booking.status] ??
                     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
@@ -427,18 +390,24 @@ export default function AdminBookingsPage() {
                                 </Badge>
                               )}
 
-                            {booking.status === "Mediated Tentative" && (
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => handleCancel(booking.bookId)}
-                                disabled={isCancelling}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                                {isCancelling ? "Cancelling..." : "Cancel"}
-                              </Button>
-                            )}
+                            {booking.status === "Mediated Tentative" &&
+                              booking.classification === "valid" && (
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                  Approve in LibCal
+                                </span>
+                              )}
+                            {booking.status === "Mediated Tentative" &&
+                              booking.classification === "invalid" && (
+                                <span className="text-xs text-red-600 dark:text-red-400">
+                                  Deny in LibCal
+                                </span>
+                              )}
+                            {booking.status === "Mediated Tentative" &&
+                              booking.classification === "review" && (
+                                <span className="text-xs text-amber-600 dark:text-amber-400">
+                                  Verify in LibCal
+                                </span>
+                              )}
                           </div>
                         </div>
                       </CardContent>
