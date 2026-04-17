@@ -22,6 +22,31 @@ const SLUG_TO_LOCATION_ID: Record<string, number> = {
   vetmed: 990,
 };
 
+// Operational hours per library: [openHour, closeHour] for each day (0=Sun … 6=Sat).
+// closeHour > 23 means next-day (e.g. 24 = midnight, 26 = 2am).
+// null = closed that day.
+type DaySchedule = [number, number] | null;
+type WeekSchedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule];
+
+const OPERATIONAL_HOURS: Record<string, WeekSchedule> = {
+  //                Sun            Mon           Tue           Wed           Thu           Fri           Sat
+  walc:   [[7, 24],       [7, 24],      [7, 24],      [7, 24],      [7, 24],      [7, 24],      [7, 24]],
+  hsse:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
+  hicks:  [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
+  kran:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 17],      [13, 17]],
+  math:   [null,          [8, 20],      [8, 20],      [8, 20],      [8, 20],      [8, 17],      null],
+  vetmed: [null,          [8, 17],      [8, 17],      [8, 17],      [8, 17],      [8, 17],      null],
+};
+
+function isWithinOperationalHours(slug: string, dayOfWeek: number, hour: number): boolean {
+  const schedule = OPERATIONAL_HOURS[slug];
+  if (!schedule) return true;
+  const daySchedule = schedule[dayOfWeek];
+  if (!daySchedule) return false;
+  const [open, close] = daySchedule;
+  return hour >= open && hour < close;
+}
+
 interface OccuspaceCount {
   normalizedDate: string;
   normalizedTime: string;
@@ -100,6 +125,10 @@ interface DayHourData {
   count: number;
 }
 
+function getScheduleForSlug(slug: string): WeekSchedule | null {
+  return OPERATIONAL_HOURS[slug] ?? null;
+}
+
 function generateRecommendations(
   allData: Map<string, DayHourData[]>,
   slugToName: Record<string, string>,
@@ -109,8 +138,13 @@ function generateRecommendations(
 
   for (const [slug, dataPoints] of allData) {
     const libName = slugToName[slug] || slug.toUpperCase();
+    const schedule = getScheduleForSlug(slug);
 
     for (let day = 0; day < 7; day++) {
+      const daySchedule = schedule?.[day];
+      if (!daySchedule) continue; // library is closed this day, skip
+
+      const [currentOpen, currentClose] = daySchedule;
       const dayData = dataPoints.filter((d) => d.dayOfWeek === day);
       if (dayData.length < 5) continue;
 
@@ -137,6 +171,7 @@ function generateRecommendations(
       const totalSamples = dayData.length;
       const dayName = DAY_NAMES[day];
       const confidence = confidenceFromSamples(totalSamples);
+      const currentHoursStr = `${formatHour(currentOpen)}–${formatHour(currentClose > 23 ? 0 : currentClose)}`;
 
       // Full day low traffic
       const dayAvgPercent =
@@ -147,8 +182,8 @@ function generateRecommendations(
           type: "low_traffic_day",
           library: libName,
           title: `Consider closing ${libName} on ${dayName}s`,
-          summary: `Average occupancy is only ${Math.round(dayAvgPercent)}% across all hours on ${dayName}s.`,
-          reasoning: buildDayReasoning(libName, dayName, hourlyAvgs, dayAvgPercent),
+          summary: `Average occupancy is only ${Math.round(dayAvgPercent)}% during operating hours (${currentHoursStr}) on ${dayName}s.`,
+          reasoning: buildDayReasoning(libName, dayName, hourlyAvgs, dayAvgPercent, currentHoursStr),
           confidence,
           impact: "high",
           data: { dayOfWeek: day, dayName, avgPercent: dayAvgPercent, hourlyBreakdown: hourlyAvgs },
@@ -156,95 +191,110 @@ function generateRecommendations(
         continue;
       }
 
-      // Close early
-      const eveningHours = hourlyAvgs.filter((h) => h.hour >= 18);
-      if (eveningHours.length >= 2) {
-        const firstLowHour = eveningHours.find((h) => h.avgPercent <= LOW_THRESHOLD);
-        if (firstLowHour) {
-          const allLowAfter = eveningHours
-            .filter((h) => h.hour >= firstLowHour.hour)
-            .every((h) => h.avgPercent <= LOW_THRESHOLD);
+      // Close early — only suggest if the library currently closes after 6pm
+      if (currentClose > 18) {
+        const eveningHours = hourlyAvgs.filter((h) => h.hour >= 18);
+        if (eveningHours.length >= 2) {
+          const firstLowHour = eveningHours.find((h) => h.avgPercent <= LOW_THRESHOLD);
+          if (firstLowHour) {
+            const allLowAfter = eveningHours
+              .filter((h) => h.hour >= firstLowHour.hour)
+              .every((h) => h.avgPercent <= LOW_THRESHOLD);
 
-          if (allLowAfter) {
-            const lastActiveHour = hourlyAvgs
-              .filter((h) => h.hour < firstLowHour.hour && h.avgPercent > LOW_THRESHOLD)
-              .pop();
-            const suggestedClose = lastActiveHour ? lastActiveHour.hour + 1 : firstLowHour.hour;
+            if (allLowAfter) {
+              const lastActiveHour = hourlyAvgs
+                .filter((h) => h.hour < firstLowHour.hour && h.avgPercent > LOW_THRESHOLD)
+                .pop();
+              const suggestedClose = lastActiveHour ? lastActiveHour.hour + 1 : firstLowHour.hour;
 
-            recommendations.push({
-              id: `${slug}-close-early-${day}`,
-              type: "close_early",
-              library: libName,
-              title: `Close ${libName} at ${formatHour(suggestedClose)} on ${dayName}s`,
-              summary: `Occupancy drops below ${LOW_THRESHOLD}% after ${formatHour(firstLowHour.hour)} (avg ${firstLowHour.avgPercent}%).`,
-              reasoning: buildCloseEarlyReasoning(libName, dayName, suggestedClose, firstLowHour.hour, eveningHours),
-              confidence,
-              impact: "medium",
-              data: { dayOfWeek: day, dayName, suggestedHour: suggestedClose, hourlyBreakdown: hourlyAvgs },
-            });
+              if (suggestedClose < currentClose) {
+                const hoursSaved = currentClose - suggestedClose;
+                recommendations.push({
+                  id: `${slug}-close-early-${day}`,
+                  type: "close_early",
+                  library: libName,
+                  title: `Close ${libName} at ${formatHour(suggestedClose)} on ${dayName}s (currently ${formatHour(currentClose > 23 ? 0 : currentClose)})`,
+                  summary: `Occupancy drops below ${LOW_THRESHOLD}% after ${formatHour(firstLowHour.hour)} (avg ${firstLowHour.avgPercent}%). Would save ${hoursSaved}h of staffing.`,
+                  reasoning: buildCloseEarlyReasoning(libName, dayName, suggestedClose, firstLowHour.hour, eveningHours, currentHoursStr),
+                  confidence,
+                  impact: hoursSaved >= 3 ? "high" : "medium",
+                  data: { dayOfWeek: day, dayName, suggestedHour: suggestedClose, hourlyBreakdown: hourlyAvgs },
+                });
+              }
+            }
           }
         }
       }
 
-      // Open later
-      const morningHours = hourlyAvgs.filter((h) => h.hour >= 7 && h.hour <= 11);
+      // Open later — only suggest if there's room to shift from the current open time
+      const morningHours = hourlyAvgs.filter((h) => h.hour >= currentOpen && h.hour <= currentOpen + 4);
       if (morningHours.length >= 2) {
         const lastLowMorning = morningHours.filter((h) => h.avgPercent <= LOW_THRESHOLD).pop();
-        if (lastLowMorning && lastLowMorning.hour >= 8) {
+        if (lastLowMorning && lastLowMorning.hour > currentOpen) {
           const allLowBefore = morningHours
             .filter((h) => h.hour <= lastLowMorning.hour)
             .every((h) => h.avgPercent <= LOW_THRESHOLD);
 
           if (allLowBefore) {
             const suggestedOpen = lastLowMorning.hour + 1;
-            recommendations.push({
-              id: `${slug}-open-later-${day}`,
-              type: "open_later",
-              library: libName,
-              title: `Open ${libName} at ${formatHour(suggestedOpen)} on ${dayName}s`,
-              summary: `Occupancy stays below ${LOW_THRESHOLD}% until ${formatHour(lastLowMorning.hour)} (avg ${lastLowMorning.avgPercent}%).`,
-              reasoning: buildOpenLaterReasoning(libName, dayName, suggestedOpen, morningHours),
-              confidence,
-              impact: "low",
-              data: { dayOfWeek: day, dayName, suggestedHour: suggestedOpen, hourlyBreakdown: hourlyAvgs },
-            });
+            if (suggestedOpen > currentOpen) {
+              const hoursSaved = suggestedOpen - currentOpen;
+              recommendations.push({
+                id: `${slug}-open-later-${day}`,
+                type: "open_later",
+                library: libName,
+                title: `Open ${libName} at ${formatHour(suggestedOpen)} on ${dayName}s (currently ${formatHour(currentOpen)})`,
+                summary: `Occupancy stays below ${LOW_THRESHOLD}% until ${formatHour(lastLowMorning.hour)} (avg ${lastLowMorning.avgPercent}%). Would save ${hoursSaved}h of staffing.`,
+                reasoning: buildOpenLaterReasoning(libName, dayName, suggestedOpen, morningHours, currentHoursStr),
+                confidence,
+                impact: "low",
+                data: { dayOfWeek: day, dayName, suggestedHour: suggestedOpen, hourlyBreakdown: hourlyAvgs },
+              });
+            }
           }
         }
       }
     }
 
-    // Cross-weekday low traffic periods
-    const weekdayData = dataPoints.filter((d) => d.dayOfWeek >= 1 && d.dayOfWeek <= 5);
-    if (weekdayData.length >= 20) {
-      const hourMap = new Map<number, { total: number; n: number }>();
-      for (const d of weekdayData) {
-        const existing = hourMap.get(d.hour) ?? { total: 0, n: 0 };
-        existing.total += d.percent;
-        existing.n++;
-        hourMap.set(d.hour, existing);
-      }
+    // Cross-weekday low traffic periods — only for libraries open past 8pm on weekdays
+    const schedule_ = getScheduleForSlug(slug);
+    const hasLateWeekdays = schedule_
+      ? [1, 2, 3, 4, 5].some((d) => { const s = schedule_[d]; return s && s[1] > 20; })
+      : false;
 
-      const lateHours = Array.from(hourMap.entries())
-        .filter(([hour]) => hour >= 20)
-        .map(([hour, { total, n }]) => ({ hour, avg: Math.round(total / n), samples: n }))
-        .filter((h) => h.avg <= LOW_THRESHOLD && h.samples >= 3);
+    if (hasLateWeekdays) {
+      const weekdayData = dataPoints.filter((d) => d.dayOfWeek >= 1 && d.dayOfWeek <= 5);
+      if (weekdayData.length >= 20) {
+        const hourMap = new Map<number, { total: number; n: number }>();
+        for (const d of weekdayData) {
+          const existing = hourMap.get(d.hour) ?? { total: 0, n: 0 };
+          existing.total += d.percent;
+          existing.n++;
+          hourMap.set(d.hour, existing);
+        }
 
-      if (lateHours.length >= 2) {
-        const earliest = lateHours[0];
-        recommendations.push({
-          id: `${slug}-weekday-close`,
-          type: "low_traffic_period",
-          library: libName,
-          title: `${libName}: low traffic after ${formatHour(earliest.hour)} on weekdays`,
-          summary: `Average weekday occupancy drops to ${earliest.avg}% by ${formatHour(earliest.hour)}.`,
-          reasoning: buildWeekdayReasoning(libName, lateHours),
-          confidence: confidenceFromSamples(weekdayData.length),
-          impact: "medium",
-          data: {
-            suggestedHour: earliest.hour,
-            hourlyBreakdown: lateHours.map((h) => ({ hour: h.hour, avgPercent: h.avg, avgCount: 0, samples: h.samples })),
-          },
-        });
+        const lateHours = Array.from(hourMap.entries())
+          .filter(([hour]) => hour >= 20)
+          .map(([hour, { total, n }]) => ({ hour, avg: Math.round(total / n), samples: n }))
+          .filter((h) => h.avg <= LOW_THRESHOLD && h.samples >= 3);
+
+        if (lateHours.length >= 2) {
+          const earliest = lateHours[0];
+          recommendations.push({
+            id: `${slug}-weekday-close`,
+            type: "low_traffic_period",
+            library: libName,
+            title: `${libName}: low traffic after ${formatHour(earliest.hour)} on weekdays`,
+            summary: `Average weekday occupancy drops to ${earliest.avg}% by ${formatHour(earliest.hour)}.`,
+            reasoning: buildWeekdayReasoning(libName, lateHours),
+            confidence: confidenceFromSamples(weekdayData.length),
+            impact: "medium",
+            data: {
+              suggestedHour: earliest.hour,
+              hourlyBreakdown: lateHours.map((h) => ({ hour: h.hour, avgPercent: h.avg, avgCount: 0, samples: h.samples })),
+            },
+          });
+        }
       }
     }
   }
@@ -258,36 +308,36 @@ function generateRecommendations(
   return recommendations;
 }
 
-function buildDayReasoning(lib: string, day: string, hourly: HourlyAvg[], avgPct: number): string {
+function buildDayReasoning(lib: string, day: string, hourly: HourlyAvg[], avgPct: number, currentHours: string): string {
   const peakHour = hourly.reduce((max, h) => (h.avgPercent > max.avgPercent ? h : max));
   return (
-    `${lib} averages only ${Math.round(avgPct)}% occupancy on ${day}s across all tracked hours. ` +
+    `${lib} is currently open ${currentHours} on ${day}s but averages only ${Math.round(avgPct)}% occupancy during those hours. ` +
     `Even the busiest hour (${formatHour(peakHour.hour)}) only reaches ${peakHour.avgPercent}% on average. ` +
-    `Based on ${hourly.reduce((s, h) => s + h.samples, 0)} data points, keeping the library open on ${day}s ` +
+    `Based on ${hourly.reduce((s, h) => s + h.samples, 0)} data points from the past 4 weeks, keeping the library open on ${day}s ` +
     `provides minimal benefit relative to staffing costs. Consider redirecting ${day} users to nearby open libraries.`
   );
 }
 
-function buildCloseEarlyReasoning(lib: string, day: string, suggested: number, firstLow: number, evening: HourlyAvg[]): string {
+function buildCloseEarlyReasoning(lib: string, day: string, suggested: number, firstLow: number, evening: HourlyAvg[], currentHours: string): string {
   const lowHours = evening.filter((h) => h.hour >= firstLow);
   const details = lowHours.map((h) => `${formatHour(h.hour)}: ${h.avgPercent}% (${h.avgCount} people)`).join(", ");
   return (
-    `On ${day}s, ${lib}'s occupancy drops significantly in the evening. ` +
-    `After ${formatHour(firstLow)}, average occupancy is consistently at or below 5%. ` +
+    `${lib} is currently open ${currentHours} on ${day}s. ` +
+    `Occupancy drops significantly in the evening — after ${formatHour(firstLow)}, it is consistently at or below 5%. ` +
     `Hourly breakdown: ${details}. ` +
     `Closing at ${formatHour(suggested)} instead would save ${evening.filter((h) => h.hour >= suggested).length} hours of staffing ` +
     `while affecting very few users (typically ${lowHours[0]?.avgCount ?? 0} or fewer people).`
   );
 }
 
-function buildOpenLaterReasoning(lib: string, day: string, suggested: number, morning: HourlyAvg[]): string {
+function buildOpenLaterReasoning(lib: string, day: string, suggested: number, morning: HourlyAvg[], currentHours: string): string {
   const lowHours = morning.filter((h) => h.hour < suggested);
   const details = lowHours.map((h) => `${formatHour(h.hour)}: ${h.avgPercent}% (${h.avgCount} people)`).join(", ");
   return (
-    `On ${day}s, ${lib} sees minimal use in the early morning hours. ` +
+    `${lib} is currently open ${currentHours} on ${day}s. ` +
     `Before ${formatHour(suggested)}, average occupancy stays at or below 5%. ` +
     `Morning breakdown: ${details}. ` +
-    `Opening at ${formatHour(suggested)} instead of the current time would reduce staffing needs with minimal impact on users.`
+    `Opening at ${formatHour(suggested)} instead would reduce staffing needs with minimal impact on users.`
   );
 }
 
@@ -335,15 +385,17 @@ export async function GET() {
     await Promise.all(
       Object.entries(SLUG_TO_LOCATION_ID).map(async ([slug, locationId]) => {
         const counts = await fetchOccuspaceHistory(token, locationId, startStr, endStr);
-        const parsed: DayHourData[] = counts.map((c) => {
-          const date = new Date(`${c.normalizedDate}T${c.normalizedTime}`);
-          return {
-            dayOfWeek: date.getDay(),
-            hour: date.getHours(),
-            percent: Math.round(c.percentage * 100),
-            count: c.count,
-          };
-        });
+        const parsed: DayHourData[] = counts
+          .map((c) => {
+            const date = new Date(`${c.normalizedDate}T${c.normalizedTime}`);
+            return {
+              dayOfWeek: date.getDay(),
+              hour: date.getHours(),
+              percent: Math.round(c.percentage * 100),
+              count: c.count,
+            };
+          })
+          .filter((d) => isWithinOperationalHours(slug, d.dayOfWeek, d.hour));
         allData.set(slug, parsed);
         totalDataPoints += parsed.length;
       }),
