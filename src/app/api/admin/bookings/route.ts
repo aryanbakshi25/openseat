@@ -93,8 +93,8 @@ export interface AdminBooking {
 const STATUS_FILTERS: Record<string, string[]> = {
   tentative: ["Mediated Tentative"],
   approved: ["Mediated Approved", "Confirmed"],
-  denied: ["Mediated Denied"],
-  cancelled: ["Cancelled by Admin", "Cancelled by User"],
+  denied: ["Mediated Denied", "Cancelled by Admin"],
+  cancelled: ["Cancelled by User"],
 };
 
 function toDateString(d: Date): string {
