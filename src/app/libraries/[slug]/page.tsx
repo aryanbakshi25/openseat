@@ -32,6 +32,8 @@ const SECONDARY_LOCATION_IDS: Record<string, { ids: number[]; label: string }> =
   walc: { ids: [17792], label: "Knowledge Lab (WALC 3007)" },
 };
 
+const SLUGS_WITH_ROOMS = new Set(["walc", "hsse", "kran", "vetmed", "math"]);
+
 function RoomCard({ room }: { room: RoomAvailability }) {
   return (
     <Card>
@@ -213,6 +215,12 @@ export default function LibraryPage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!SLUGS_WITH_ROOMS.has(slug)) {
+      setLoadingRooms(false);
+      return;
+    }
+
     const offset = TIME_WINDOWS[selectedWindow].offsetMinutes;
     const start = new Date(Date.now() + offset * 60_000);
     const end = new Date(start.getTime() + 60 * 60_000);
