@@ -10,6 +10,7 @@ const SLUG_ORDER: Record<string, number> = {
   kran: 3,
   math: 4,
   vetmed: 5,
+  avtech: 6,
 };
 
 export async function GET() {

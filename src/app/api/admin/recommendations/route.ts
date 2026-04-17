@@ -20,6 +20,7 @@ const SLUG_TO_LOCATION_ID: Record<string, number> = {
   math: 988,
   kran: 987,
   vetmed: 990,
+  avtech: 991,
 };
 
 import type { DaySchedule, WeekSchedule } from "@/lib/types";
