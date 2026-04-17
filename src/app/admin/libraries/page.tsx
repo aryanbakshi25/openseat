@@ -15,13 +15,29 @@ import {
   Check,
   Library as LibraryIcon,
 } from "lucide-react";
+import type { DaySchedule, WeekSchedule } from "@/lib/types";
+import { DAY_LABELS, formatHourLabel, formatDaySchedule } from "@/lib/utils";
 
 interface Library {
   id: string;
   slug: string;
   name: string;
-  hours: unknown;
+  hours: WeekSchedule | null;
   created_at: string;
+}
+
+const HOUR_OPTIONS: number[] = Array.from({ length: 25 }, (_, i) => i);
+const DEFAULT_SCHEDULE: WeekSchedule = [null, [8, 17], [8, 17], [8, 17], [8, 17], [8, 17], null];
+
+function HoursSummary({ hours }: { hours: WeekSchedule | null }) {
+  if (!hours) return <span className="text-xs text-muted-foreground italic">No hours set</span>;
+  const today = new Date().getDay();
+  const ds = hours[today];
+  return (
+    <span className="text-xs text-muted-foreground">
+      Today: {formatDaySchedule(ds)}
+    </span>
+  );
 }
 
 export default function AdminLibrariesPage() {
@@ -38,6 +54,7 @@ export default function AdminLibrariesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editSlug, setEditSlug] = useState("");
+  const [editHours, setEditHours] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
   const [saving, setSaving] = useState(false);
 
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -92,6 +109,32 @@ export default function AdminLibrariesPage() {
     setEditId(lib.id);
     setEditName(lib.name);
     setEditSlug(lib.slug);
+    setEditHours(lib.hours ?? DEFAULT_SCHEDULE);
+  }
+
+  function updateEditDay(dayIdx: number, value: DaySchedule) {
+    setEditHours((prev) => {
+      const next = [...prev] as WeekSchedule;
+      next[dayIdx] = value;
+      return next;
+    });
+  }
+
+  function toggleEditClosed(dayIdx: number) {
+    const current = editHours[dayIdx];
+    updateEditDay(dayIdx, current ? null : [8, 17]);
+  }
+
+  function setEditOpen(dayIdx: number, h: number) {
+    const current = editHours[dayIdx];
+    const close = current ? current[1] : 17;
+    updateEditDay(dayIdx, [h, Math.max(h + 1, close)]);
+  }
+
+  function setEditClose(dayIdx: number, h: number) {
+    const current = editHours[dayIdx];
+    const open = current ? current[0] : 8;
+    updateEditDay(dayIdx, [Math.min(open, h - 1), h]);
   }
 
   async function handleSaveEdit() {
@@ -101,7 +144,7 @@ export default function AdminLibrariesPage() {
       const res = await fetch(`/api/admin/libraries/${editId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, slug: editSlug }),
+        body: JSON.stringify({ name: editName, slug: editSlug, hours: editHours }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -153,7 +196,7 @@ export default function AdminLibrariesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Libraries</h1>
           <p className="text-muted-foreground mt-1">
-            Manage libraries displayed on OpenSeat
+            Manage libraries and operating hours
           </p>
         </div>
         <Button size="sm" onClick={() => setShowAdd(true)} disabled={showAdd}>
@@ -162,7 +205,6 @@ export default function AdminLibrariesPage() {
         </Button>
       </div>
 
-      {/* Add form */}
       {showAdd && (
         <Card className="mb-6">
           <CardContent className="py-4">
@@ -254,54 +296,125 @@ export default function AdminLibrariesPage() {
               <Card key={lib.id}>
                 <CardContent className="py-3">
                   {isEditing ? (
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                      <input
-                        type="text"
-                        value={editSlug}
-                        onChange={(e) =>
-                          setEditSlug(
-                            e.target.value
-                              .toLowerCase()
-                              .replace(/[^a-z0-9-]/g, ""),
-                          )
-                        }
-                        placeholder="Abbreviation"
-                        className="w-28 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                      <div className="flex gap-1">
+                    <div className="space-y-4">
+                      {/* Name + Slug row */}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="flex-1">
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Name</label>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <div className="w-full sm:w-32">
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Abbreviation</label>
+                          <input
+                            type="text"
+                            value={editSlug}
+                            onChange={(e) =>
+                              setEditSlug(
+                                e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+                              )
+                            }
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Hours grid */}
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                          Operating Hours
+                        </label>
+                        <div className="space-y-1.5">
+                          {DAY_LABELS.map((dayLabel, dayIdx) => {
+                            const ds = editHours[dayIdx];
+                            const isClosed = ds === null;
+                            return (
+                              <div
+                                key={dayLabel}
+                                className="flex items-center gap-2 sm:gap-3"
+                              >
+                                <span className="w-10 text-xs font-medium text-muted-foreground shrink-0">
+                                  {dayLabel}
+                                </span>
+                                <label className="flex items-center gap-1.5 shrink-0 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={!isClosed}
+                                    onChange={() => toggleEditClosed(dayIdx)}
+                                    className="rounded border-input"
+                                  />
+                                  <span className="text-xs text-muted-foreground">Open</span>
+                                </label>
+                                {isClosed ? (
+                                  <span className="text-xs text-muted-foreground italic">Closed</span>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <select
+                                      value={ds[0]}
+                                      onChange={(e) => setEditOpen(dayIdx, parseInt(e.target.value))}
+                                      className="rounded-md border border-input bg-background px-1.5 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                      {HOUR_OPTIONS.filter((h) => h < (ds[1] ?? 24)).map((h) => (
+                                        <option key={h} value={h}>{formatHourLabel(h)}</option>
+                                      ))}
+                                    </select>
+                                    <span className="text-xs text-muted-foreground">to</span>
+                                    <select
+                                      value={ds[1]}
+                                      onChange={(e) => setEditClose(dayIdx, parseInt(e.target.value))}
+                                      className="rounded-md border border-input bg-background px-1.5 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                      {HOUR_OPTIONS.filter((h) => h > (ds[0] ?? 0)).map((h) => (
+                                        <option key={h} value={h}>{formatHourLabel(h)}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Save / Cancel */}
+                      <div className="flex gap-2 pt-1">
                         <Button
-                          variant="ghost"
-                          size="icon-xs"
+                          size="sm"
                           onClick={handleSaveEdit}
                           disabled={saving}
                         >
-                          <Check className="h-4 w-4" />
+                          <Check className="h-3.5 w-3.5" />
+                          {saving ? "Saving..." : "Save"}
                         </Button>
                         <Button
                           variant="ghost"
-                          size="icon-xs"
+                          size="sm"
                           onClick={() => setEditId(null)}
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-3.5 w-3.5" />
+                          Cancel
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <LibraryIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium text-sm truncate">
-                          {lib.name}
-                        </span>
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          {lib.slug}
-                        </Badge>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <LibraryIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium text-sm truncate">
+                            {lib.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {lib.slug}
+                          </Badge>
+                        </div>
+                        <div className="pl-7">
+                          <HoursSummary hours={lib.hours} />
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
