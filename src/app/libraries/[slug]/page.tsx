@@ -293,7 +293,7 @@ export default function LibraryPage() {
           <p className={`text-sm mt-2 flex items-center gap-1.5 ${
             getTodaySchedule(library.hours).isOpen
               ? "text-emerald-600 dark:text-emerald-400"
-              : "text-muted-foreground"
+              : "text-red-600 dark:text-red-400"
           }`}>
             <Clock className="h-3.5 w-3.5" />
             {getTodaySchedule(library.hours).label}

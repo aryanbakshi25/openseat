@@ -27,10 +27,38 @@ export function formatDaySchedule(ds: DaySchedule): string {
 
 export function getTodaySchedule(hours: WeekSchedule | null): { label: string; isOpen: boolean } {
   if (!hours) return { label: "Hours not set", isOpen: false };
-  const dayOfWeek = new Date().getDay();
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const currentHour = now.getHours() + now.getMinutes() / 60;
   const ds = hours[dayOfWeek];
-  if (!ds) return { label: "Closed today", isOpen: false };
-  const [open, close] = ds;
-  if (open === 0 && close === 24) return { label: "Open 24 hours", isOpen: true };
-  return { label: `Open ${formatHourLabel(open)} – ${formatHourLabel(close)}`, isOpen: true };
+
+  if (ds) {
+    const [open, close] = ds;
+    if (open === 0 && close === 24) return { label: "Open 24 hours", isOpen: true };
+
+    if (currentHour >= open && currentHour < close) {
+      return { label: `Open ${formatHourLabel(open)} – ${formatHourLabel(close)}`, isOpen: true };
+    }
+
+    if (currentHour < open) {
+      return { label: `Closed until ${formatHourLabel(open)}`, isOpen: false };
+    }
+  }
+
+  const nextOpen = findNextOpen(hours, dayOfWeek);
+  if (nextOpen) return { label: `Closed until ${nextOpen}`, isOpen: false };
+  return { label: "Closed", isOpen: false };
+}
+
+function findNextOpen(hours: WeekSchedule, today: number): string | null {
+  for (let offset = 1; offset <= 7; offset++) {
+    const idx = (today + offset) % 7;
+    const ds = hours[idx];
+    if (ds) {
+      const dayName = DAY_LABELS[idx];
+      return `${dayName} ${formatHourLabel(ds[0])}`;
+    }
+  }
+  return null;
 }

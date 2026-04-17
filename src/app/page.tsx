@@ -111,7 +111,7 @@ export default function HomePage() {
                           No data available
                         </p>
                       )}
-                      <p className={`text-xs mt-2 flex items-center gap-1 ${todayHours.isOpen ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                      <p className={`text-xs mt-2 flex items-center gap-1 ${todayHours.isOpen ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         <Clock className="h-3 w-3" />
                         {todayHours.label}
                       </p>
