@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Clock,
   User,
-  MapPin,
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
@@ -17,6 +16,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  DoorOpen,
 } from "lucide-react";
 
 interface AdminBooking {
@@ -152,6 +152,24 @@ export default function AdminBookingsPage() {
 
   const locations = Object.keys(grouped).sort();
   const showClassification = tab === "tentative" || tab === "all";
+
+  function groupByRoom(bookings: AdminBooking[]): [string, AdminBooking[]][] {
+    const byRoom: Record<string, AdminBooking[]> = {};
+    for (const b of bookings) {
+      (byRoom[b.room] ??= []).push(b);
+    }
+    for (const arr of Object.values(byRoom)) {
+      arr.sort((a, b) => new Date(a.fromDate).getTime() - new Date(b.fromDate).getTime());
+    }
+    const isInterview = (name: string) => /interview/i.test(name);
+    return Object.entries(byRoom).sort(([a], [b]) => {
+      const ai = isInterview(a);
+      const bi = isInterview(b);
+      if (ai && !bi) return -1;
+      if (!ai && bi) return 1;
+      return a.localeCompare(b);
+    });
+  }
 
   function toggleLocation(loc: string) {
     setExpanded((prev) => {
@@ -318,102 +336,108 @@ export default function AdminBookingsPage() {
                 </button>
 
                 {isExpanded && (
-                  <div className="space-y-2 mt-2 ml-6">
-                    {grouped[location].map((booking) => {
-                  const config =
-                    CLASSIFICATION_CONFIG[booking.classification];
-                  const StatusIcon = config.Icon;
-                  const statusBadgeClass =
-                    STATUS_BADGE[booking.status] ??
-                    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
-
-                  return (
-                    <Card key={booking.bookId}>
-                      <CardContent className="py-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex-1 min-w-0 space-y-1.5">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                              <span className="font-medium text-sm">
-                                {booking.room}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5 shrink-0" />
-                              {formatTimeRange(
-                                booking.fromDate,
-                                booking.toDate,
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 text-sm">
-                              <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                              <span>
-                                {booking.firstName} {booking.lastName}
-                              </span>
-                              {booking.username && (
-                                <span className="text-muted-foreground">
-                                  ({booking.username})
-                                </span>
-                              )}
-                            </div>
-
-                            {booking.patronType && (
-                              <p className="text-xs text-muted-foreground pl-5.5">
-                                Patron: {booking.patronType}
-                              </p>
-                            )}
-                            {booking.created && (
-                              <p className="text-xs text-muted-foreground pl-5.5">
-                                Submitted {formatDateTime(booking.created)}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
-                            {/* Booking status */}
-                            <Badge
-                              className={`${statusBadgeClass} text-xs font-medium border-0`}
-                            >
-                              {booking.status}
-                            </Badge>
-
-                            {/* Patron classification (only for pending) */}
-                            {showClassification &&
-                              booking.status === "Mediated Tentative" && (
-                                <Badge
-                                  className={`${config.className} gap-1 text-xs font-medium border-0`}
-                                >
-                                  <StatusIcon className="h-3 w-3" />
-                                  {config.label}
-                                </Badge>
-                              )}
-
-                            {booking.status === "Mediated Tentative" &&
-                              booking.classification === "valid" && (
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                                  Approve in LibCal
-                                </span>
-                              )}
-                            {booking.status === "Mediated Tentative" &&
-                              booking.classification === "invalid" && (
-                                <span className="text-xs text-red-600 dark:text-red-400">
-                                  Deny in LibCal
-                                </span>
-                              )}
-                            {booking.status === "Mediated Tentative" &&
-                              booking.classification === "review" && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400">
-                                  Verify in LibCal
-                                </span>
-                              )}
-                          </div>
+                  <div className="mt-2 ml-6 space-y-4">
+                    {groupByRoom(grouped[location]).map(([room, bookings]) => (
+                      <div key={room}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <DoorOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            {room}
+                          </h3>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {bookings.length}
+                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                    })}
+                        <div className="space-y-2">
+                          {bookings.map((booking) => {
+                            const config =
+                              CLASSIFICATION_CONFIG[booking.classification];
+                            const StatusIcon = config.Icon;
+                            const statusBadgeClass =
+                              STATUS_BADGE[booking.status] ??
+                              "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+
+                            return (
+                              <Card key={booking.bookId}>
+                                <CardContent className="py-3">
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Clock className="h-3.5 w-3.5 shrink-0" />
+                                        {formatTimeRange(
+                                          booking.fromDate,
+                                          booking.toDate,
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span>
+                                          {booking.firstName} {booking.lastName}
+                                        </span>
+                                        {booking.username && (
+                                          <span className="text-muted-foreground">
+                                            ({booking.username})
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {booking.patronType && (
+                                        <p className="text-xs text-muted-foreground pl-5.5">
+                                          Patron: {booking.patronType}
+                                        </p>
+                                      )}
+                                      {booking.created && (
+                                        <p className="text-xs text-muted-foreground pl-5.5">
+                                          Submitted {formatDateTime(booking.created)}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
+                                      <Badge
+                                        className={`${statusBadgeClass} text-xs font-medium border-0`}
+                                      >
+                                        {booking.status}
+                                      </Badge>
+
+                                      {showClassification &&
+                                        booking.status === "Mediated Tentative" && (
+                                          <Badge
+                                            className={`${config.className} gap-1 text-xs font-medium border-0`}
+                                          >
+                                            <StatusIcon className="h-3 w-3" />
+                                            {config.label}
+                                          </Badge>
+                                        )}
+
+                                      {booking.status === "Mediated Tentative" &&
+                                        booking.classification === "valid" && (
+                                          <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                                            Approve in LibCal
+                                          </span>
+                                        )}
+                                      {booking.status === "Mediated Tentative" &&
+                                        booking.classification === "invalid" && (
+                                          <span className="text-xs text-red-600 dark:text-red-400">
+                                            Deny in LibCal
+                                          </span>
+                                        )}
+                                      {booking.status === "Mediated Tentative" &&
+                                        booking.classification === "review" && (
+                                          <span className="text-xs text-amber-600 dark:text-amber-400">
+                                            Verify in LibCal
+                                          </span>
+                                        )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>
