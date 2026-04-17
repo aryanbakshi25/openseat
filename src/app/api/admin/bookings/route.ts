@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       allLocationIds.map(async (lid) => {
         const res = await fetch(
-          `${LIBCAL_BASE_URL}/space/bookings?lid=${lid}&date=${today}&days=${days}&limit=500&include_tentative=1`,
+          `${LIBCAL_BASE_URL}/space/bookings?lid=${lid}&date=${today}&days=${days}&limit=500&include_tentative=1&include_cancelled=1`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         if (!res.ok) return;
