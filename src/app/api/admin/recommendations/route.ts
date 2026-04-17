@@ -30,7 +30,7 @@ type WeekSchedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySche
 
 const OPERATIONAL_HOURS: Record<string, WeekSchedule> = {
   //                Sun            Mon           Tue           Wed           Thu           Fri           Sat
-  walc:   [[7, 24],       [7, 24],      [7, 24],      [7, 24],      [7, 24],      [7, 24],      [7, 24]],
+  walc:   [[0, 24],       [0, 24],      [0, 24],      [0, 24],      [0, 24],      [0, 24],      [0, 24]],
   hsse:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
   hicks:  [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
   kran:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 17],      [13, 17]],
@@ -136,7 +136,10 @@ function generateRecommendations(
   const recommendations: Recommendation[] = [];
   const LOW_THRESHOLD = 5;
 
+  const SKIP_RECOMMENDATIONS = new Set(["walc"]); // 24/7 libraries — no hour changes needed
+
   for (const [slug, dataPoints] of allData) {
+    if (SKIP_RECOMMENDATIONS.has(slug)) continue;
     const libName = slugToName[slug] || slug.toUpperCase();
     const schedule = getScheduleForSlug(slug);
 
