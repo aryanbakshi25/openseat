@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CrowdBadge } from "@/components/crowd-badge";
 import { ArrowLeft, Clock, Users, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
-import type { CrowdingData, AvailabilityData, SubAreaCrowding, RoomAvailability } from "@/lib/types";
+import type { CrowdingData, AvailabilityData, SubAreaCrowding, RoomAvailability, Library, WeekSchedule } from "@/lib/types";
+import { DAY_LABELS_FULL, formatDaySchedule, getTodaySchedule } from "@/lib/utils";
 
 const TIME_WINDOWS = [
   { label: "Now", offsetMinutes: 0 },
@@ -143,8 +144,39 @@ function RoomList({ rooms, librarySlug }: { rooms: RoomAvailability[]; librarySl
   );
 }
 
+function HoursTable({ hours }: { hours: WeekSchedule }) {
+  const today = new Date().getDay();
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      {DAY_LABELS_FULL.map((dayName, i) => {
+        const ds = hours[i];
+        const isToday = i === today;
+        return (
+          <div
+            key={dayName}
+            className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${
+              isToday ? "bg-accent/50 font-medium" : ""
+            }`}
+          >
+            <span className="text-sm">
+              {dayName}
+              {isToday && (
+                <span className="text-xs text-muted-foreground ml-1.5">(Today)</span>
+              )}
+            </span>
+            <span className={`text-sm ${ds ? "" : "text-muted-foreground italic"}`}>
+              {formatDaySchedule(ds)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function LibraryPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [library, setLibrary] = useState<Library | null>(null);
   const [crowding, setCrowding] = useState<CrowdingData | null>(null);
   const [availability, setAvailability] = useState<AvailabilityData | null>(
     null,
@@ -154,9 +186,17 @@ export default function LibraryPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [roomsFetchId, setRoomsFetchId] = useState(0);
 
-  const libraryName = slug.toUpperCase();
+  const libraryName = library?.name ?? slug.toUpperCase();
 
   useEffect(() => {
+    fetch("/api/libraries")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((libs: Library[]) => {
+        const match = libs.find((l) => l.slug === slug);
+        if (match) setLibrary(match);
+      })
+      .catch(() => {});
+
     fetch(`/api/crowding?librarySlug=${slug}`)
       .then((r) => (r.ok ? r.json() : null))
       .then(setCrowding)
@@ -241,12 +281,23 @@ export default function LibraryPage() {
             )}
           </div>
         ) : null}
+        {library?.hours && (
+          <p className={`text-sm mt-2 flex items-center gap-1.5 ${
+            getTodaySchedule(library.hours).isOpen
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-muted-foreground"
+          }`}>
+            <Clock className="h-3.5 w-3.5" />
+            {getTodaySchedule(library.hours).label}
+          </p>
+        )}
       </div>
 
       <Tabs defaultValue="crowding">
         <TabsList>
           <TabsTrigger value="crowding">Crowding</TabsTrigger>
           <TabsTrigger value="rooms">Rooms</TabsTrigger>
+          <TabsTrigger value="hours">Hours</TabsTrigger>
         </TabsList>
 
         {/* ── Crowding Tab ── */}
@@ -375,6 +426,15 @@ export default function LibraryPage() {
             <p className="text-muted-foreground">
               No reservable rooms found for this library.
             </p>
+          )}
+        </TabsContent>
+
+        {/* ── Hours Tab ── */}
+        <TabsContent value="hours" className="mt-4">
+          {library?.hours ? (
+            <HoursTable hours={library.hours} />
+          ) : (
+            <p className="text-muted-foreground">Hours not available.</p>
           )}
         </TabsContent>
       </Tabs>

@@ -1,9 +1,13 @@
 // ── Core domain types ──
 
+export type DaySchedule = [number, number] | null;
+export type WeekSchedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule];
+
 export interface Library {
   id: string;
   slug: string;
   name: string;
+  hours: WeekSchedule | null;
   created_at: string;
 }
 

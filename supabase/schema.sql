@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS libraries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug text UNIQUE NOT NULL,
   name text NOT NULL,
+  hours jsonb DEFAULT null,  -- 7-element array (Sun–Sat): each [openHour,closeHour] or null
   created_at timestamptz DEFAULT now()
 );
 

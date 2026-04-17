@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getServiceClient } from "@/lib/supabase/server";
 
+const dayScheduleSchema = z.union([
+  z.tuple([z.number().int().min(0).max(24), z.number().int().min(0).max(24)]),
+  z.null(),
+]);
+
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   slug: z
@@ -10,6 +15,7 @@ const updateSchema = z.object({
     .max(20)
     .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens")
     .optional(),
+  hours: z.array(dayScheduleSchema).length(7).optional(),
 });
 
 export async function PUT(

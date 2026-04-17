@@ -20,6 +20,7 @@ interface Library {
   id: string;
   slug: string;
   name: string;
+  hours: unknown;
   created_at: string;
 }
 

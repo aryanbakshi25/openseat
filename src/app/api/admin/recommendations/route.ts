@@ -22,24 +22,13 @@ const SLUG_TO_LOCATION_ID: Record<string, number> = {
   vetmed: 990,
 };
 
-// Operational hours per library: [openHour, closeHour] for each day (0=Sun … 6=Sat).
-// closeHour > 23 means next-day (e.g. 24 = midnight, 26 = 2am).
-// null = closed that day.
-type DaySchedule = [number, number] | null;
-type WeekSchedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule];
+import type { DaySchedule, WeekSchedule } from "@/lib/types";
 
-const OPERATIONAL_HOURS: Record<string, WeekSchedule> = {
-  //                Sun            Mon           Tue           Wed           Thu           Fri           Sat
-  walc:   [[0, 24],       [0, 24],      [0, 24],      [0, 24],      [0, 24],      [0, 24],      [0, 24]],
-  hsse:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
-  hicks:  [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 18],      [13, 17]],
-  kran:   [[13, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 24],      [8, 17],      [13, 17]],
-  math:   [null,          [8, 20],      [8, 20],      [8, 20],      [8, 20],      [8, 17],      null],
-  vetmed: [null,          [8, 17],      [8, 17],      [8, 17],      [8, 17],      [8, 17],      null],
-};
+// Populated at request time from the DB; used by filter and recommendation functions.
+let operationalHours: Record<string, WeekSchedule> = {};
 
 function isWithinOperationalHours(slug: string, dayOfWeek: number, hour: number): boolean {
-  const schedule = OPERATIONAL_HOURS[slug];
+  const schedule = operationalHours[slug];
   if (!schedule) return true;
   const daySchedule = schedule[dayOfWeek];
   if (!daySchedule) return false;
@@ -126,7 +115,7 @@ interface DayHourData {
 }
 
 function getScheduleForSlug(slug: string): WeekSchedule | null {
-  return OPERATIONAL_HOURS[slug] ?? null;
+  return operationalHours[slug] ?? null;
 }
 
 function generateRecommendations(
@@ -373,12 +362,14 @@ export async function GET() {
     const endStr = toDateString(endDate);
     const daysCovered = 28;
 
-    // Get library names from Supabase
+    // Get library names and hours from Supabase
     const supabase = getServiceClient();
-    const { data: libraries } = await supabase.from("libraries").select("slug, name");
+    const { data: libraries } = await supabase.from("libraries").select("slug, name, hours");
     const slugToName: Record<string, string> = {};
+    operationalHours = {};
     for (const lib of libraries ?? []) {
       slugToName[lib.slug] = lib.name;
+      if (lib.hours) operationalHours[lib.slug] = lib.hours as WeekSchedule;
     }
 
     // Fetch historical data for all libraries in parallel

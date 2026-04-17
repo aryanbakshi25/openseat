@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Library,
   Lightbulb,
+  Clock,
   LogOut,
   Menu,
   X,
@@ -18,6 +19,7 @@ import { useState } from "react";
 const NAV_ITEMS = [
   { href: "/admin/bookings", label: "Bookings", Icon: ClipboardList },
   { href: "/admin/libraries", label: "Libraries", Icon: Library },
+  { href: "/admin/hours", label: "Hours", Icon: Clock },
   { href: "/admin/recommendations", label: "Recommendations", Icon: Lightbulb },
 ];
 

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CrowdBadge } from "@/components/crowd-badge";
 import type { Library, CrowdingData } from "@/lib/types";
-import { MapPin, Users } from "lucide-react";
+import { getTodaySchedule } from "@/lib/utils";
+import { MapPin, Users, Clock } from "lucide-react";
 
 export default function HomePage() {
   const [libraries, setLibraries] = useState<Library[]>([]);
@@ -79,6 +80,7 @@ export default function HomePage() {
             ))
           : libraries.map((lib) => {
               const data = crowding[lib.slug];
+              const todayHours = getTodaySchedule(lib.hours);
               return (
                 <Link key={lib.id} href={`/libraries/${lib.slug}`}>
                   <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
@@ -109,6 +111,10 @@ export default function HomePage() {
                           No data available
                         </p>
                       )}
+                      <p className={`text-xs mt-2 flex items-center gap-1 ${todayHours.isOpen ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                        <Clock className="h-3 w-3" />
+                        {todayHours.label}
+                      </p>
                     </CardContent>
                   </Card>
                 </Link>
