@@ -48,6 +48,9 @@ async function lookupPatron(username: string): Promise<PatronLookup | null> {
     const text = await res.text();
     try {
       const data = JSON.parse(text);
+      if (data.error) {
+        return { patronType: data.error, status: "Not Found" };
+      }
       return {
         patronType: data.patron_type ?? data.user_group ?? text.trim(),
         status: data.status ?? "Unknown",
