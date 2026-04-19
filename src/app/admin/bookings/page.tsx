@@ -62,6 +62,13 @@ const CLASSIFICATION_CONFIG = {
   },
 } as const;
 
+const CLASSIFICATION_CARD_STYLE: Record<string, string> = {
+  valid: "border-l-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-950/10",
+  review: "border-l-amber-500/50 bg-amber-50/30 dark:bg-amber-950/10",
+  invalid: "border-l-red-500/50 bg-red-50/30 dark:bg-red-950/10",
+  unknown: "",
+};
+
 const STATUS_BADGE: Record<string, string> = {
   "Mediated Tentative":
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
@@ -358,8 +365,13 @@ export default function AdminBookingsPage() {
                               STATUS_BADGE[booking.status] ??
                               "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
 
+                            const cardTint =
+                              booking.status === "Mediated Tentative"
+                                ? CLASSIFICATION_CARD_STYLE[booking.classification] ?? ""
+                                : "";
+
                             return (
-                              <Card key={booking.bookId}>
+                              <Card key={booking.bookId} className={`border-l-4 ${cardTint}`}>
                                 <CardContent className="py-3">
                                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="flex-1 min-w-0 space-y-1.5">
