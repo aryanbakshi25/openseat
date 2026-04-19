@@ -204,7 +204,7 @@ export default function RecommendationsPage() {
             Hours Recommendations
           </h1>
           <p className="text-muted-foreground mt-1">
-            AI-powered suggestions based on historical occupancy data
+            Data backed suggestions based on historical occupancy data
           </p>
         </div>
         <Button
