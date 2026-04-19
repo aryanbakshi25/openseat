@@ -41,10 +41,12 @@ async function lookupPatron(username: string): Promise<PatronLookup | null> {
   if (!proxyUrl || !apiKey) return null;
 
   try {
-    const res = await fetch(
-      `${proxyUrl}?username=${encodeURIComponent(username)}&apikey=${apiKey}`,
-    );
-    if (!res.ok) return null;
+    const url = `${proxyUrl}?username=${encodeURIComponent(username)}&apikey=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`Alma proxy ${res.status} for ${username}`);
+      return null;
+    }
     const text = await res.text();
     try {
       const data = JSON.parse(text);
@@ -58,7 +60,8 @@ async function lookupPatron(username: string): Promise<PatronLookup | null> {
     } catch {
       return { patronType: text.trim(), status: "Unknown" };
     }
-  } catch {
+  } catch (err) {
+    console.error(`Alma proxy fetch failed for ${username}:`, err);
     return null;
   }
 }
