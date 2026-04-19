@@ -43,21 +43,18 @@ async function lookupPatron(username: string): Promise<PatronLookup | null> {
   try {
     const url = `${proxyUrl}?username=${encodeURIComponent(username)}&apikey=${apiKey}`;
     const res = await fetch(url);
-    if (!res.ok) {
-      console.error(`Alma proxy ${res.status} for ${username}`);
-      return null;
-    }
     const text = await res.text();
     try {
       const data = JSON.parse(text);
-      if (data.error) {
-        return { patronType: data.error, status: "Not Found" };
+      if (data.error || !res.ok) {
+        return { patronType: data.error ?? "Not found", status: "Not Found" };
       }
       return {
         patronType: data.patron_type ?? data.user_group ?? text.trim(),
         status: data.status ?? "Unknown",
       };
     } catch {
+      if (!res.ok) return { patronType: "Not found", status: "Not Found" };
       return { patronType: text.trim(), status: "Unknown" };
     }
   } catch (err) {
