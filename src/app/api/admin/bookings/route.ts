@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
       },
       {
         bookId: "demo-review",
-        room: "Group Study Room - HSSE 145",
+        room: "Interview Room - HSSE 147",
         location: "HSSE Library",
         fromDate: `${demoDate}T15:30:00-04:00`,
         toDate: `${demoDate}T16:30:00-04:00`,
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
       },
       {
         bookId: "demo-invalid",
-        room: "Group Study Room - HSSE 145",
+        room: "Interview Room - HSSE 147",
         location: "HSSE Library",
         fromDate: `${demoDate}T17:00:00-04:00`,
         toDate: `${demoDate}T18:00:00-04:00`,
