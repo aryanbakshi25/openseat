@@ -191,63 +191,6 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    // ── DEMO MOCK BOOKINGS (remove after presentation) ──
-    const demoDate = "2026-04-25";
-    const demoMocks: AdminBooking[] = [
-      {
-        bookId: "demo-valid",
-        room: "Interview Room - HSSE 147",
-        location: "HSSE Library",
-        fromDate: `${demoDate}T14:00:00-04:00`,
-        toDate: `${demoDate}T15:00:00-04:00`,
-        firstName: "Aryan",
-        lastName: "Student",
-        email: "bakshi7@purdue.edu",
-        username: "bakshi7",
-        status: "Mediated Tentative",
-        created: "2026-04-23T10:00:00-04:00",
-        patronType: "Undergrad",
-        patronStatus: "Active",
-        classification: "valid",
-      },
-      {
-        bookId: "demo-review",
-        room: "Interview Room - HSSE 147",
-        location: "HSSE Library",
-        fromDate: `${demoDate}T15:30:00-04:00`,
-        toDate: `${demoDate}T16:30:00-04:00`,
-        firstName: "Aryan",
-        lastName: "Staff",
-        email: "bakshi7@purdue.edu",
-        username: "bakshi7",
-        status: "Mediated Tentative",
-        created: "2026-04-23T10:05:00-04:00",
-        patronType: "Staff",
-        patronStatus: "Active",
-        classification: "review",
-      },
-      {
-        bookId: "demo-invalid",
-        room: "Interview Room - HSSE 147",
-        location: "HSSE Library",
-        fromDate: `${demoDate}T17:00:00-04:00`,
-        toDate: `${demoDate}T18:00:00-04:00`,
-        firstName: "Aryan",
-        lastName: "Deny",
-        email: "bakshi7@purdue.edu",
-        username: "bakshi7",
-        status: "Mediated Tentative",
-        created: "2026-04-23T10:10:00-04:00",
-        patronType: "User not found in Alma",
-        patronStatus: "Not Found",
-        classification: "invalid",
-      },
-    ];
-    if (statusFilter === "tentative" || statusFilter === "all") {
-      enriched.push(...demoMocks);
-    }
-    // ── END DEMO MOCK BOOKINGS ──
-
     enriched.sort(
       (a, b) =>
         new Date(a.fromDate).getTime() - new Date(b.fromDate).getTime(),
