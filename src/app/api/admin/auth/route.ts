@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
-  const token = deriveToken(password);
+  const token = await deriveToken(password);
   const res = NextResponse.json({ success: true });
   res.cookies.set(ADMIN_COOKIE, token, {
     httpOnly: true,

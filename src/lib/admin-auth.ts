@@ -8,12 +8,21 @@
  * This will be replaced with Purdue CAS/SSO when IT access is granted.
  */
 
-import { createHmac } from "crypto";
-
 export const ADMIN_COOKIE = "admin_session";
 
 const HMAC_KEY = "openseat-session-key";
 
-export function deriveToken(password: string): string {
-  return createHmac("sha256", HMAC_KEY).update(password).digest("hex");
+export async function deriveToken(password: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(HMAC_KEY),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(password));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }

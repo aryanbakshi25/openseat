@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_COOKIE, deriveToken } from "@/lib/admin-auth";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isLoginPage = pathname === "/admin/login";
@@ -19,8 +19,9 @@ export function middleware(request: NextRequest) {
   if (isAdminPage || isAdminApi) {
     const password = process.env.ADMIN_PASSWORD;
     const session = request.cookies.get(ADMIN_COOKIE)?.value;
+    const expected = password ? await deriveToken(password) : null;
 
-    if (!password || !session || session !== deriveToken(password)) {
+    if (!password || !session || session !== expected) {
       if (isAdminApi) {
         return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
