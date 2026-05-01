@@ -25,7 +25,8 @@ export async function GET() {
       .select("*");
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Libraries fetch error:", error.message);
+      return NextResponse.json({ error: "Failed to fetch libraries" }, { status: 500 });
     }
 
     const sorted = (data ?? []).sort(
