@@ -14,7 +14,7 @@ export function middleware(request: NextRequest) {
   }
 
   const isAdminPage = pathname.startsWith("/admin");
-  const isAdminApi = pathname.startsWith("/api/admin");
+  const isAdminApi = pathname.startsWith("/api/admin") || pathname.startsWith("/api/staff");
 
   if (isAdminPage || isAdminApi) {
     const password = process.env.ADMIN_PASSWORD;
@@ -35,5 +35,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/staff/:path*"],
 };
