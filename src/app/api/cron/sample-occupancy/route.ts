@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const token = process.env.OCCUSPACE_API_TOKEN;
   if (!token) {
     return NextResponse.json(
-      { error: "OCCUSPACE_API_TOKEN not configured" },
+      { error: "External service not configured" },
       { status: 500 },
     );
   }

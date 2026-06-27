@@ -39,12 +39,13 @@ export async function GET(req: NextRequest) {
 
     const { data: rooms, error } = await supabase
       .from("rooms")
-      .select("*")
+      .select("id, display_name, floor, capacity, is_reservable")
       .eq("library_id", lib.id)
       .order("display_name");
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Rooms fetch error:", error.message);
+      return NextResponse.json({ error: "Failed to fetch rooms" }, { status: 500 });
     }
 
     setCache(cacheKey, rooms);

@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
   const clientSecret = process.env.LIBCAL_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     return NextResponse.json(
-      { error: "LibCal credentials not configured" },
+      { error: "External service not configured" },
       { status: 500 },
     );
   }

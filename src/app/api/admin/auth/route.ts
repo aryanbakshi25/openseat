@@ -4,10 +4,7 @@ import { ADMIN_COOKIE, deriveToken } from "@/lib/admin-auth";
 export async function POST(req: NextRequest) {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) {
-    return NextResponse.json(
-      { error: "Admin access is not configured" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: { password?: string };

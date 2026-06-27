@@ -54,7 +54,8 @@ export async function PUT(
           { status: 409 },
         );
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin library update error:", error.message);
+      return NextResponse.json({ error: "Failed to update library" }, { status: 500 });
     }
 
     return NextResponse.json({ library: data });
@@ -77,7 +78,8 @@ export async function DELETE(
     const { error } = await supabase.from("libraries").delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin library delete error:", error.message);
+      return NextResponse.json({ error: "Failed to delete library" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

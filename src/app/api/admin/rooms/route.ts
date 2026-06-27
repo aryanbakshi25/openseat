@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
       .order("display_name");
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin rooms fetch error:", error.message);
+      return NextResponse.json({ error: "Failed to fetch rooms" }, { status: 500 });
     }
 
     return NextResponse.json({ rooms: data });
@@ -71,7 +72,8 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin room create error:", error.message);
+      return NextResponse.json({ error: "Failed to create room" }, { status: 500 });
     }
 
     return NextResponse.json({ room: data }, { status: 201 });

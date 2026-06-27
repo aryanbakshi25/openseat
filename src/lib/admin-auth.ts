@@ -10,13 +10,12 @@
 
 export const ADMIN_COOKIE = "admin_session";
 
-const HMAC_KEY = "openseat-session-key";
-
 export async function deriveToken(password: string): Promise<string> {
+  const hmacKey = process.env.ADMIN_SESSION_SECRET ?? password;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    enc.encode(HMAC_KEY),
+    enc.encode(hmacKey),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

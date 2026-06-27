@@ -22,7 +22,7 @@ export async function GET() {
     const supabase = getServiceClient();
     const { data, error } = await supabase
       .from("libraries")
-      .select("*");
+      .select("id, slug, name, hours");
 
     if (error) {
       console.error("Libraries fetch error:", error.message);

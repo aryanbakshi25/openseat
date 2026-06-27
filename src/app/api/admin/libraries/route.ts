@@ -20,7 +20,8 @@ export async function GET() {
       .order("name");
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin libraries fetch error:", error.message);
+      return NextResponse.json({ error: "Failed to fetch libraries" }, { status: 500 });
     }
 
     return NextResponse.json({ libraries: data });
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         );
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin library create error:", error.message);
+      return NextResponse.json({ error: "Failed to create library" }, { status: 500 });
     }
 
     return NextResponse.json({ library: data }, { status: 201 });

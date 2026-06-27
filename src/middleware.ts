@@ -7,9 +7,8 @@ export async function middleware(request: NextRequest) {
 
   const isLoginPage = pathname === "/admin/login";
   const isAuthApi = pathname === "/api/admin/auth";
-  const isCronApi = pathname.startsWith("/api/cron/");
 
-  if (isLoginPage || isAuthApi || isCronApi) {
+  if (isLoginPage || isAuthApi) {
     return NextResponse.next();
   }
 

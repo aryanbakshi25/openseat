@@ -39,7 +39,8 @@ export async function PUT(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin room update error:", error.message);
+      return NextResponse.json({ error: "Failed to update room" }, { status: 500 });
     }
 
     return NextResponse.json({ room: data });
@@ -62,7 +63,8 @@ export async function DELETE(
     const { error } = await supabase.from("rooms").delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Admin room delete error:", error.message);
+      return NextResponse.json({ error: "Failed to delete room" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

@@ -66,9 +66,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Where | Description |
 |----------|-------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Client + Server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + Server | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** | Supabase service role key (never expose to client) |
+| `SUPABASE_URL` | **Server only** | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** | Supabase service role key |
+| `ADMIN_PASSWORD` | **Server only** | Shared admin panel password |
+| `ADMIN_SESSION_SECRET` | **Server only** | Random 32+ byte hex secret for session HMAC |
+| `CRON_SECRET` | **Server only** | Bearer token for cron endpoints |
 
 ## Deployment to Vercel
 
@@ -98,9 +100,11 @@ vercel --prod
 
 In Vercel Dashboard → Project Settings → Environment Variables, add:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+- `CRON_SECRET`
 
 ### 4. Verify
 
